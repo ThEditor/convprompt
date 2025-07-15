@@ -32,6 +32,7 @@ interface ConversationExample {
 interface ExamplesManagerProps {
   examples: ConversationExample[]
   onExamplesChange: (examples: ConversationExample[]) => void
+  onCreateNew?: () => void
 }
 
 function SortableExampleCard({
@@ -270,8 +271,7 @@ function ExampleCreator({
   )
 }
 
-export function ExamplesManager({ examples, onExamplesChange }: ExamplesManagerProps) {
-  const [isCreating, setIsCreating] = useState(false)
+export function ExamplesManager({ examples, onExamplesChange, onCreateNew }: ExamplesManagerProps) {
   const { toast } = useToast()
 
   const sensors = useSensors(
@@ -300,7 +300,6 @@ export function ExamplesManager({ examples, onExamplesChange }: ExamplesManagerP
       ...exampleData,
     }
     onExamplesChange([...examples, newExample])
-    setIsCreating(false)
     toast({
       title: "Example added",
       description: "Conversation example has been added successfully.",
@@ -326,20 +325,10 @@ export function ExamplesManager({ examples, onExamplesChange }: ExamplesManagerP
           <h2 className="text-xl font-semibold">Conversation Examples</h2>
           <p className="text-sm text-slate-600">Add example conversations to help train your AI assistant</p>
         </div>
-        <Dialog open={isCreating} onOpenChange={setIsCreating}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Example
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create Conversation Example</DialogTitle>
-            </DialogHeader>
-            <ExampleCreator onSave={addExample} onCancel={() => setIsCreating(false)} />
-          </DialogContent>
-        </Dialog>
+        <Button onClick={onCreateNew}>
+          <Plus className="h-4 w-4 mr-2" />
+          Create Example
+        </Button>
       </div>
 
       {examples.length > 0 ? (
@@ -363,7 +352,11 @@ export function ExamplesManager({ examples, onExamplesChange }: ExamplesManagerP
             <div className="text-center">
               <MessageSquare className="h-12 w-12 text-slate-400 mx-auto mb-4" />
               <p className="text-slate-600 mb-2">No conversation examples yet</p>
-              <p className="text-sm text-slate-500">Add examples to help train your AI assistant</p>
+              <p className="text-sm text-slate-500 mb-4">Add examples to help train your AI assistant</p>
+              <Button onClick={onCreateNew}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Example
+              </Button>
             </div>
           </CardContent>
         </Card>

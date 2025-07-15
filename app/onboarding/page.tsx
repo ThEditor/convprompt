@@ -123,8 +123,9 @@ export default function OnboardingPage() {
 
   const handleFinish = () => {
     // Create the bot configuration
+    const botId = `bot-${Date.now()}`
     const botConfig = {
-      id: `bot-${Date.now()}`,
+      id: botId,
       name: formData.name,
       config: {
         name: formData.name,
@@ -156,9 +157,9 @@ export default function OnboardingPage() {
     // Save to localStorage
     const existing = localStorage.getItem("savedBots")
     const bots = existing ? JSON.parse(existing) : []
-    const updated = [...bots, botConfig]
-    localStorage.setItem("savedBots", JSON.stringify(updated))
-    localStorage.setItem("currentBotId", botConfig.id)
+    bots.push(botConfig)
+    localStorage.setItem("savedBots", JSON.stringify(bots))
+    localStorage.setItem("currentBotId", botId)
 
     toast({
       title: "Bot created successfully!",

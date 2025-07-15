@@ -2,15 +2,16 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Bot, Plus, Search, Calendar, Zap, Trash2, Edit2 } from "lucide-react"
+import { Plus, Search, Calendar, Zap, Trash2, Edit2, Upload } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useToast } from "@/hooks/use-toast"
+import yaml from "js-yaml"
 
 interface SavedBot {
   id: string
@@ -26,6 +27,7 @@ export default function HomePage() {
   const [bots, setBots] = useState<SavedBot[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -44,7 +46,7 @@ export default function HomePage() {
             parsedBots.map((bot: any) => ({
               id: bot.id,
               name: bot.name,
-              description: bot.config?.description || "No description",
+              description: bot.config?.description || "No description available",
               createdAt: bot.savedAt,
               updatedAt: bot.savedAt,
               sectionsCount: bot.config?.sections?.length || 0,
@@ -53,6 +55,7 @@ export default function HomePage() {
           )
         } catch (error) {
           console.error("Error loading bots:", error)
+          setBots([])
         }
       }
       setIsLoading(false)
@@ -85,6 +88,66 @@ export default function HomePage() {
     router.push("/builder")
   }
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string
+        const loadedConfig = yaml.load(content) as any
+
+        // Validate the loaded config has required fields
+        if (!loadedConfig.name || !loadedConfig.sections) {
+          throw new Error("Invalid configuration file")
+        }
+
+        // Create a new bot from the loaded config
+        const botId = `bot-${Date.now()}`
+        const botConfig = {
+          id: botId,
+          name: loadedConfig.name,
+          config: {
+            name: loadedConfig.name,
+            description: loadedConfig.description || "",
+            sections: loadedConfig.sections,
+            inputLanguages: loadedConfig.inputLanguages || ["en-US"],
+            responseLanguages: loadedConfig.responseLanguages || ["en-US"],
+            languageRules: loadedConfig.languageRules || "",
+            examples: loadedConfig.examples || [],
+          },
+          savedAt: new Date().toISOString(),
+        }
+
+        // Save to localStorage
+        const existing = localStorage.getItem("savedBots")
+        const bots = existing ? JSON.parse(existing) : []
+        bots.push(botConfig)
+        localStorage.setItem("savedBots", JSON.stringify(bots))
+
+        // Reload bots and show success message
+        loadBots()
+        toast({
+          title: "Bot imported",
+          description: `"${loadedConfig.name}" has been imported successfully.`,
+        })
+      } catch (error) {
+        toast({
+          title: "Import failed",
+          description: "Failed to load YAML file. Please check the file format.",
+          variant: "destructive",
+        })
+      }
+    }
+    reader.readAsText(file)
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       {/* Header */}
@@ -93,24 +156,40 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
-                <Bot className="h-6 w-6 text-white" />
+                <img src="/favicon.svg" alt="ConvPrompt" className="h-6 w-6" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                  AI Prompt Builder
+                  ConvPrompt
                 </h1>
                 <p className="text-sm text-slate-500">Build sophisticated AI system prompts</p>
               </div>
             </div>
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <div className="flex items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".yaml,.yml"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
               <Button
-                onClick={handleCreateNew}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Create New Bot
+                <Upload className="h-4 w-4 mr-2" />
+                Import YAML
               </Button>
-            </motion.div>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button
+                  onClick={handleCreateNew}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New Bot
+                </Button>
+              </motion.div>
+            </div>
           </div>
         </div>
       </div>
@@ -129,10 +208,6 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-4 text-sm text-slate-600">
             <span>{bots.length} bots created</span>
-            <Badge variant="outline" className="bg-white/50">
-              <Zap className="h-3 w-3 mr-1" />
-              Pro Features
-            </Badge>
           </div>
         </div>
 
@@ -163,7 +238,7 @@ export default function HomePage() {
           ) : filteredBots.length === 0 ? (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
               <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-                <Bot className="h-10 w-10 text-blue-500" />
+                <img src="/favicon.svg" alt="ConvPrompt" className="h-10 w-10" />
               </div>
               <h3 className="text-xl font-semibold text-slate-900 mb-2">
                 {searchQuery ? "No bots found" : "No bots created yet"}

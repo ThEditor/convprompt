@@ -31,6 +31,7 @@ interface Section {
 
 interface BotConfig {
   name: string
+  description?: string
   sections: Section[]
   inputLanguages: string[]
   responseLanguages: string[]
@@ -70,27 +71,43 @@ export function SaveLoadManager({ config, onLoad }: SaveLoadManagerProps) {
   }
 
   const saveToLocalStorage = () => {
-    const savedBot: SavedBot = {
-      id: `bot-${Date.now()}`,
-      name: config.name,
-      config,
-      savedAt: new Date().toISOString(),
-    }
-
     const existing = localStorage.getItem("savedBots")
     const bots = existing ? JSON.parse(existing) : []
-    const updated = [...bots, savedBot]
+    
+    // Check if this is the currently active bot
+    const currentBotId = localStorage.getItem("currentBotId")
+    const existingBotIndex = bots.findIndex((bot: SavedBot) => bot.id === currentBotId)
+    
+    if (existingBotIndex !== -1) {
+      // Update existing bot
+      bots[existingBotIndex].config = config
+      bots[existingBotIndex].savedAt = new Date().toISOString()
+      toast({
+        title: "Bot updated",
+        description: `"${config.name}" has been updated in browser storage.`,
+      })
+    } else {
+      // Create new bot
+      const savedBot: SavedBot = {
+        id: `bot-${Date.now()}`,
+        name: config.name,
+        config,
+        savedAt: new Date().toISOString(),
+      }
+      bots.push(savedBot)
+      localStorage.setItem("currentBotId", savedBot.id)
+      toast({
+        title: "Bot saved",
+        description: `"${config.name}" has been saved to browser storage.`,
+      })
+    }
 
-    localStorage.setItem("savedBots", JSON.stringify(updated))
-    setSavedBots(updated)
-
-    toast({
-      title: "Bot saved",
-      description: `"${config.name}" has been saved to local storage.`,
-    })
+    localStorage.setItem("savedBots", JSON.stringify(bots))
+    setSavedBots(bots)
   }
 
   const loadFromLocalStorage = (savedBot: SavedBot) => {
+    localStorage.setItem("currentBotId", savedBot.id)
     onLoad(savedBot.config)
     setIsOpen(false)
     toast({
@@ -151,16 +168,27 @@ export function SaveLoadManager({ config, onLoad }: SaveLoadManagerProps) {
         const content = e.target?.result as string
         const loadedConfig = yaml.load(content) as BotConfig
 
-        // Validate the loaded config has required fields
+        // Validate required fields
         if (!loadedConfig.name || !loadedConfig.sections) {
           throw new Error("Invalid configuration file")
         }
 
-        onLoad(loadedConfig)
+        // Ensure all fields exist with defaults
+        const validatedConfig: BotConfig = {
+          name: loadedConfig.name,
+          description: loadedConfig.description || "",
+          sections: loadedConfig.sections,
+          inputLanguages: loadedConfig.inputLanguages || ["en-US"],
+          responseLanguages: loadedConfig.responseLanguages || ["en-US"],
+          languageRules: loadedConfig.languageRules || "",
+          examples: loadedConfig.examples || [],
+        }
+
+        onLoad(validatedConfig)
         setIsOpen(false)
         toast({
           title: "File loaded",
-          description: `"${loadedConfig.name}" has been loaded from YAML file.`,
+          description: `"${validatedConfig.name}" has been loaded from YAML file.`,
         })
       } catch (error) {
         toast({
@@ -172,7 +200,6 @@ export function SaveLoadManager({ config, onLoad }: SaveLoadManagerProps) {
     }
     reader.readAsText(file)
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -207,7 +234,7 @@ export function SaveLoadManager({ config, onLoad }: SaveLoadManagerProps) {
                   <Save className="h-4 w-4 mr-2" />
                   Save to Browser
                 </Button>
-                <Button onClick={downloadAsYAML} variant="outline" className="flex-1 bg-transparent">
+                <Button onClick={downloadAsYAML} variant="outline" className="flex-1">
                   <Download className="h-4 w-4 mr-2" />
                   Download YAML
                 </Button>

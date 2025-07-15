@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -29,10 +29,11 @@ interface ExamplesPanelProps {
   onClose: () => void
   examples: ConversationExample[]
   onExamplesChange: (examples: ConversationExample[]) => void
+  mode?: "list" | "create"
 }
 
-export function ExamplesPanel({ isOpen, onClose, examples, onExamplesChange }: ExamplesPanelProps) {
-  const [isCreating, setIsCreating] = useState(false)
+export function ExamplesPanel({ isOpen, onClose, examples, onExamplesChange, mode = "list" }: ExamplesPanelProps) {
+  const [isCreating, setIsCreating] = useState(mode === "create")
   const [currentExample, setCurrentExample] = useState<Partial<ConversationExample>>({
     name: "",
     messages: [],
@@ -40,6 +41,13 @@ export function ExamplesPanel({ isOpen, onClose, examples, onExamplesChange }: E
   const [currentMessage, setCurrentMessage] = useState("")
   const [currentEntity, setCurrentEntity] = useState<"Bot" | "User">("User")
   const { toast } = useToast()
+
+  // When mode is "create", automatically start creating and close when done
+  useEffect(() => {
+    if (mode === "create") {
+      setIsCreating(true)
+    }
+  }, [mode])
 
   const addMessage = () => {
     if (!currentMessage.trim()) return
@@ -83,7 +91,14 @@ export function ExamplesPanel({ isOpen, onClose, examples, onExamplesChange }: E
 
     onExamplesChange([...examples, newExample])
     setCurrentExample({ name: "", messages: [] })
-    setIsCreating(false)
+    
+    if (mode === "create") {
+      // Close the panel after saving when in create mode
+      onClose()
+    } else {
+      setIsCreating(false)
+    }
+    
     toast({
       title: "Example saved",
       description: "Conversation example has been added successfully.",
@@ -109,6 +124,11 @@ export function ExamplesPanel({ isOpen, onClose, examples, onExamplesChange }: E
     setIsCreating(false)
     setCurrentExample({ name: "", messages: [] })
     setCurrentMessage("")
+    
+    if (mode === "create") {
+      // Close the panel when canceling in create mode
+      onClose()
+    }
   }
 
   return (
@@ -138,8 +158,12 @@ export function ExamplesPanel({ isOpen, onClose, examples, onExamplesChange }: E
                 <div className="flex items-center gap-3">
                   <MessageSquare className="h-5 w-5 text-blue-600" />
                   <div>
-                    <h2 className="font-semibold text-slate-900">Examples</h2>
-                    <p className="text-sm text-slate-500">{examples.length} conversations</p>
+                    <h2 className="font-semibold text-slate-900">
+                      {mode === "create" ? "Create Example" : "Examples"}
+                    </h2>
+                    <p className="text-sm text-slate-500">
+                      {mode === "create" ? "Build a conversation example" : `${examples.length} conversations`}
+                    </p>
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" onClick={onClose}>
@@ -150,8 +174,8 @@ export function ExamplesPanel({ isOpen, onClose, examples, onExamplesChange }: E
 
             {/* Content */}
             <div className="flex-1 overflow-hidden flex flex-col">
-              {isCreating ? (
-                /* Creating New Example */
+              {(isCreating || mode === "create") ? (
+                /* Creating New Example - This is the chatbox interface */
                 <div className="flex-1 p-6 space-y-4">
                   <div>
                     <label className="text-sm font-medium text-slate-700">Example Name</label>
@@ -270,95 +294,97 @@ export function ExamplesPanel({ isOpen, onClose, examples, onExamplesChange }: E
                   </div>
                 </div>
               ) : (
-                /* Examples List */
-                <div className="flex-1 overflow-y-auto">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-medium text-slate-900">Saved Examples</h3>
-                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                        <Button size="sm" onClick={startCreating}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          New Example
-                        </Button>
-                      </motion.div>
-                    </div>
+                /* Examples List - Only show when mode is "list" */
+                mode === "list" && (
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-medium text-slate-900">Saved Examples</h3>
+                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                          <Button size="sm" onClick={startCreating}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            New Example
+                          </Button>
+                        </motion.div>
+                      </div>
 
-                    {examples.length === 0 ? (
-                      <div className="text-center py-12">
-                        <MessageSquare className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                        <p className="text-slate-600 mb-2">No examples yet</p>
-                        <p className="text-sm text-slate-500 mb-4">
-                          Create conversation examples to help train your AI
-                        </p>
-                        <Button onClick={startCreating}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create First Example
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {examples.map((example, index) => (
-                          <motion.div
-                            key={example.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.1 }}
-                          >
-                            <Card className="hover:shadow-md transition-shadow">
-                              <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                  <CardTitle className="text-base">{example.name}</CardTitle>
-                                  <div className="flex items-center gap-1">
-                                    <Badge variant="outline" className="text-xs">
-                                      {example.messages.length} messages
-                                    </Badge>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => deleteExample(example.id)}
-                                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="space-y-2 max-h-32 overflow-y-auto">
-                                  {example.messages.slice(0, 3).map((message) => (
-                                    <div
-                                      key={message.id}
-                                      className={`p-2 rounded text-xs ${
-                                        message.entity === "Bot"
-                                          ? "bg-blue-50 border-l-2 border-blue-200"
-                                          : "bg-green-50 border-l-2 border-green-200"
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-1 mb-1">
-                                        {message.entity === "Bot" ? (
-                                          <Bot className="h-2 w-2 text-blue-600" />
-                                        ) : (
-                                          <User className="h-2 w-2 text-green-600" />
-                                        )}
-                                        <span className="font-medium">{message.entity}:</span>
-                                      </div>
-                                      <p className="text-slate-700 line-clamp-2">{message.content}</p>
+                      {examples.length === 0 ? (
+                        <div className="text-center py-12">
+                          <MessageSquare className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                          <p className="text-slate-600 mb-2">No examples yet</p>
+                          <p className="text-sm text-slate-500 mb-4">
+                            Create conversation examples to help train your AI
+                          </p>
+                          <Button onClick={startCreating}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create First Example
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {examples.map((example, index) => (
+                            <motion.div
+                              key={example.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.1 }}
+                            >
+                              <Card className="hover:shadow-md transition-shadow">
+                                <CardHeader className="pb-3">
+                                  <div className="flex items-center justify-between">
+                                    <CardTitle className="text-base">{example.name}</CardTitle>
+                                    <div className="flex items-center gap-1">
+                                      <Badge variant="outline" className="text-xs">
+                                        {example.messages.length} messages
+                                      </Badge>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => deleteExample(example.id)}
+                                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
                                     </div>
-                                  ))}
-                                  {example.messages.length > 3 && (
-                                    <p className="text-xs text-slate-500 text-center">
-                                      +{example.messages.length - 3} more messages
-                                    </p>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        ))}
-                      </div>
-                    )}
+                                  </div>
+                                </CardHeader>
+                                <CardContent>
+                                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                                    {example.messages.slice(0, 3).map((message) => (
+                                      <div
+                                        key={message.id}
+                                        className={`p-2 rounded text-xs ${
+                                          message.entity === "Bot"
+                                            ? "bg-blue-50 border-l-2 border-blue-200"
+                                            : "bg-green-50 border-l-2 border-green-200"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-1 mb-1">
+                                          {message.entity === "Bot" ? (
+                                            <Bot className="h-2 w-2 text-blue-600" />
+                                          ) : (
+                                            <User className="h-2 w-2 text-green-600" />
+                                          )}
+                                          <span className="font-medium">{message.entity}:</span>
+                                        </div>
+                                        <p className="text-slate-700 line-clamp-2">{message.content}</p>
+                                      </div>
+                                    ))}
+                                    {example.messages.length > 3 && (
+                                      <p className="text-xs text-slate-500 text-center">
+                                        +{example.messages.length - 3} more messages
+                                      </p>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )
               )}
             </div>
           </motion.div>

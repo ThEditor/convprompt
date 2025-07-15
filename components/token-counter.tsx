@@ -49,7 +49,7 @@ export function TokenCounter({ prompt, model }: TokenCounterProps) {
   const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Calculator
 
   return (
-    <Card className="w-fit">
+    <Card className="w-[120%]">
       <CardContent className="p-3">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">

@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Bot, Home, Settings, HelpCircle, Plus, ChevronLeft, Zap } from "lucide-react"
+import { Home, Plus, ChevronLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 
@@ -16,11 +16,46 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const router = useRouter()
-  const [recentBots] = useState([
-    { id: "1", name: "Customer Support", status: "active" },
-    { id: "2", name: "Content Creator", status: "draft" },
-    { id: "3", name: "Technical Assistant", status: "active" },
-  ])
+  const [recentBots, setRecentBots] = useState<Array<{ id: string; name: string; status: string }>>([])
+
+  useEffect(() => {
+    loadRecentBots()
+  }, [])
+
+  const loadRecentBots = () => {
+    const saved = localStorage.getItem("savedBots")
+    if (saved) {
+      try {
+        const bots = JSON.parse(saved)
+        const recent = bots.slice(-3).reverse().map((bot: any) => ({
+          id: bot.id,
+          name: bot.name || bot.config?.name || "Unnamed Bot",
+          status: "active"
+        }))
+        setRecentBots(recent)
+      } catch (error) {
+        console.error("Error loading recent bots:", error)
+        setRecentBots([])
+      }
+    }
+  }
+
+  const handleBotClick = (botId: string) => {
+    localStorage.setItem("currentBotId", botId)
+    
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new CustomEvent('botChanged'))
+    
+    // Only close sidebar on mobile
+    if (window.innerWidth < 1024) {
+      onToggle()
+    }
+    
+    // Don't navigate away from builder if we're already there
+    if (window.location.pathname !== '/builder') {
+      router.push("/builder")
+    }
+  }
 
   return (
     <>
@@ -39,11 +74,11 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
-                <Bot className="h-5 w-5 text-white" />
+                <img src="/favicon.svg" alt="ConvPrompt" className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="font-semibold text-slate-900">AI Builder</h2>
-                <p className="text-xs text-slate-500">v2.0</p>
+                <h2 className="font-semibold text-slate-900">ConvPrompt</h2>
+                <p className="text-xs text-slate-500">v0.2</p>
               </div>
             </div>
             <Button variant="ghost" size="sm" onClick={onToggle} className="lg:hidden">
@@ -57,16 +92,6 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           <Button variant="ghost" className="w-full justify-start" onClick={() => router.push("/")}>
             <Home className="h-4 w-4 mr-3" />
             Dashboard
-          </Button>
-
-          <Button variant="ghost" className="w-full justify-start">
-            <Settings className="h-4 w-4 mr-3" />
-            Settings
-          </Button>
-
-          <Button variant="ghost" className="w-full justify-start">
-            <HelpCircle className="h-4 w-4 mr-3" />
-            Help & Support
           </Button>
 
           <Separator className="my-4" />
@@ -85,10 +110,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 <Card
                   key={bot.id}
                   className="cursor-pointer hover:bg-slate-50 transition-colors"
-                  onClick={() => {
-                    localStorage.setItem("currentBotId", bot.id)
-                    router.push("/builder")
-                  }}
+                  onClick={() => handleBotClick(bot.id)}
                 >
                   <CardContent className="p-3">
                     <div className="flex items-center justify-between">
@@ -102,24 +124,11 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                   </CardContent>
                 </Card>
               ))}
+              {recentBots.length === 0 && (
+                <p className="text-xs text-slate-500 text-center py-4">No bots created yet</p>
+              )}
             </div>
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t">
-          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Zap className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-900">Upgrade to Pro</span>
-              </div>
-              <p className="text-xs text-blue-700 mb-3">Unlock advanced features and unlimited bots</p>
-              <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700">
-                Upgrade Now
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       </motion.div>
     </>
